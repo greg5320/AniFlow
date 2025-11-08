@@ -8,8 +8,10 @@ import (
 	"os"
 	"strconv"
 	// "time"
+	"sort"
 	"strings"
 
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	kodik "github.com/greg5320/AniFlow/backend/services/catalog/internal/kodik" 
 	pb "github.com/greg5320/AniFlow/backend/services/catalog/gen" 
 	"google.golang.org/grpc"
@@ -21,67 +23,33 @@ type server struct {
 	client *kodik.Client
 }
 
-func isKodikID(s string) bool {
-	if s == "" {
-		return false
-	}
-	return strings.HasPrefix(s, "movie-") || strings.HasPrefix(s, "serial-")
-}
+// func isKodikID(s string) bool {
+// 	if s == "" {
+// 		return false
+// 	}
+// 	return strings.HasPrefix(s, "movie-") || strings.HasPrefix(s, "serial-")
+// }
 func canonicalKey(m kodik.Material) string {
 	if m.KinopoiskID != "" {
 		return "kp:" + m.KinopoiskID
 	}
-	if m.ShikimoriID != "" {
-		return "sh:" + m.ShikimoriID
-	}
+	// if m.ShikimoriID != "" {
+	// 	return "sh:" + m.ShikimoriID
+	// }
 	return fmt.Sprintf("ttl:%s|%d", strings.ToLower(strings.TrimSpace(m.Title)), m.Year)
 }
-
 func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchResponse, error) {
-	page := int(req.Page)
-	if page < 1 {
-		page = 1
-	}
 	pageSize := int(req.PageSize)
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-
-	if req.Query != "" && isKodikID(req.Query) {
-		mat, err := s.client.FetchByID(ctx, req.Query, true)
-		if err != nil {
-			return nil, err
-		}
-		pbItem := &pb.Anime{
-			KodikId:      mat.ID,
-			Title:        mat.Title,
-			Description:  mat.Description,
-			PosterUrl:    mat.PosterURL,
-			EpisodesCount: int32(mat.EpisodesCount),
-			UpdatedAt:    timestamppb.Now(),
-		}
-		if mat.Translation != nil {
-			pbItem.Translations = append(pbItem.Translations, &pb.Translation{
-				Id:    int32(mat.Translation.ID),
-				Title: mat.Translation.Title,
-				Type:  mat.Translation.Type,
-			})
-		}
-		return &pb.SearchResponse{
-			Items: []*pb.Anime{pbItem},
-			Total: 1,
-		}, nil
-	}
-
-	lr, err := s.client.Search(ctx, req.Query, pageSize, true) 
+	lr, err := s.client.Search(ctx, req.Query, pageSize, true)
 	if err != nil {
 		return nil, err
 	}
-
 	type agg struct {
-		Representative kodik.Material
-		Translations   map[int]kodik.Translation 
-		Count          int
+		Rep          kodik.Material
+		Translations map[int]kodik.Translation
 	}
 	mmap := make(map[string]*agg)
 
@@ -89,30 +57,55 @@ func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchR
 		key := canonicalKey(m)
 		a, ok := mmap[key]
 		if !ok {
-			a = &agg{
-				Representative: m,
-				Translations:   make(map[int]kodik.Translation),
-				Count:          0,
-			}
+			a = &agg{Rep: m, Translations: make(map[int]kodik.Translation)}
 			mmap[key] = a
 		}
-		a.Count++
 		if m.Translation != nil {
 			a.Translations[m.Translation.ID] = *m.Translation
 		}
+		if a.Rep.PosterURL == "" && m.PosterURL != "" {
+			a.Rep.PosterURL = m.PosterURL
+		}
+		if a.Rep.Description == "" && m.Description != "" {
+			a.Rep.Description = m.Description
+		}
+		if len(a.Rep.Genres) == 0 && len(m.Genres) > 0 {
+			a.Rep.Genres = m.Genres
+		}
+		if m.KinopoiskRating > a.Rep.KinopoiskRating {
+			a.Rep.KinopoiskRating = m.KinopoiskRating
+		}
 	}
 
+	keys := make([]string, 0, len(mmap))
+	for k := range mmap {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return mmap[keys[i]].Rep.Title < mmap[keys[j]].Rep.Title
+	})
 
 	resp := &pb.SearchResponse{}
-	for _, a := range mmap {
-		rep := a.Representative
+	for _, k := range keys {
+		a := mmap[k]
+		rep := a.Rep
 		item := &pb.Anime{
-			KodikId:      rep.ID, 
-			Title:        rep.Title,
-			Description:  rep.Description,
-			PosterUrl:    rep.PosterURL,
+			KodikId:       rep.ID,
+			Title:         rep.Title,
+			Description:   rep.Description,
+			PosterUrl:     rep.PosterURL,
 			EpisodesCount: int32(rep.EpisodesCount),
-			UpdatedAt:    timestamppb.Now(),
+			Year:          int32(rep.Year),
+			Genres: rep.Genres,
+			UpdatedAt: timestamppb.Now(),
+		}
+		if rep.KinopoiskRating > 0 {
+			item.KinopoiskRating = rep.KinopoiskRating
+		} else {
+			item.KinopoiskRating = 0
+		}
+		if rep.AnimePosterURL != "" {
+			item.AnimePosterUrl = rep.AnimePosterURL
 		}
 		for _, tr := range a.Translations {
 			item.Translations = append(item.Translations, &pb.Translation{
@@ -126,9 +119,10 @@ func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchR
 	resp.Total = int32(len(resp.Items))
 	return resp, nil
 }
+
 func (s *server) GetAnime(ctx context.Context, req *pb.GetAnimeRequest) (*pb.Anime, error) {
 	if req == nil || req.KodikId == "" {
-		return nil, fmt.Errorf("kodik_id is required")
+		return nil, fmt.Errorf("kodik_id required")
 	}
 
 	mat, err := s.client.FetchByID(ctx, req.KodikId, true)
@@ -136,46 +130,88 @@ func (s *server) GetAnime(ctx context.Context, req *pb.GetAnimeRequest) (*pb.Ani
 		return nil, err
 	}
 
-	var translationsMap = make(map[int]kodik.Translation)
+	transMap := make(map[int]kodik.Translation)
+	if mat.Translation != nil {
+		transMap[mat.Translation.ID] = *mat.Translation
+	}
+
 	if mat.KinopoiskID != "" {
-		lr, err := s.client.SearchByKinopoiskID(ctx, mat.KinopoiskID, 100, true)
+		lr, err := s.client.SearchByKinopoiskID(ctx, mat.KinopoiskID, 200, true)
 		if err == nil {
-			for _, m := range lr.Results {
-				if m.Translation != nil {
-					translationsMap[m.Translation.ID] = *m.Translation
+			for _, mm := range lr.Results {
+				if canonicalKey(mm) != canonicalKey(*mat) {
+					continue
 				}
-				if mat.PosterURL == "" && m.PosterURL != "" {
-					mat.PosterURL = m.PosterURL
+				if mm.Translation != nil {
+					transMap[mm.Translation.ID] = *mm.Translation
 				}
-				if mat.Description == "" && m.Description != "" {
-					mat.Description = m.Description
+				if mat.PosterURL == "" && mm.PosterURL != "" {
+					mat.PosterURL = mm.PosterURL
+				}
+				if mat.AnimePosterURL == "" && mm.AnimePosterURL != "" {
+					mat.AnimePosterURL = mm.AnimePosterURL
+				}
+				if len(mat.Genres) == 0 && len(mm.Genres) > 0 {
+					mat.Genres = mm.Genres
+				}
+				if mm.KinopoiskRating > mat.KinopoiskRating {
+					mat.KinopoiskRating = mm.KinopoiskRating
 				}
 			}
 		}
 	} else {
-		if mat.Translation != nil {
-			translationsMap[mat.Translation.ID] = *mat.Translation
+		lr, err := s.client.Search(ctx, mat.Title, 50, true)
+		if err == nil {
+			for _, mm := range lr.Results {
+				if canonicalKey(mm) != canonicalKey(*mat) {
+					continue
+				}
+				if mm.Translation != nil {
+					transMap[mm.Translation.ID] = *mm.Translation
+				}
+			}
 		}
 	}
 
-	anime := &pb.Anime{
-		KodikId:      mat.ID,
-		Title:        mat.Title,
-		Description:  mat.Description,
-		PosterUrl:    mat.PosterURL,
-		EpisodesCount: int32(mat.EpisodesCount),
-		UpdatedAt:    timestamppb.Now(),
+	var fullData *structpb.Struct
+	if mat.Raw != nil {
+		sv, convErr := structpb.NewStruct(mat.Raw)
+		if convErr != nil {
+			fmt.Printf("[warn] failed to convert raw to structpb: %v\n", convErr)
+		} else {
+			fullData = sv
+		}
 	}
 
-	for _, tr := range translationsMap {
-		anime.Translations = append(anime.Translations, &pb.Translation{
+	out := &pb.Anime{
+		KodikId:       req.KodikId,
+		Title:         mat.Title,
+		Description:   mat.Description,
+		PosterUrl:     mat.PosterURL,
+		EpisodesCount: int32(mat.EpisodesCount),
+		Year:          int32(mat.Year),
+		Genres:        mat.Genres,
+		UpdatedAt:     timestamppb.Now(),
+		KinopoiskRating: mat.KinopoiskRating,
+		AnimePosterUrl:  mat.AnimePosterURL,
+		FullData:        fullData,
+	}
+
+	ids := make([]int, 0, len(transMap))
+	for id := range transMap {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		tr := transMap[id]
+		out.Translations = append(out.Translations, &pb.Translation{
 			Id:    int32(tr.ID),
 			Title: tr.Title,
 			Type:  tr.Type,
 		})
 	}
 
-	return anime, nil
+	return out, nil
 }
 
 

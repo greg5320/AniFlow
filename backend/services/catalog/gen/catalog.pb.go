@@ -9,6 +9,7 @@ package catalogpb
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -83,18 +84,21 @@ func (x *Translation) GetType() string {
 }
 
 type Anime struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	KodikId       string                 `protobuf:"bytes,1,opt,name=kodik_id,json=kodikId,proto3" json:"kodik_id,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Genres        []string               `protobuf:"bytes,4,rep,name=genres,proto3" json:"genres,omitempty"`
-	PosterUrl     string                 `protobuf:"bytes,5,opt,name=poster_url,json=posterUrl,proto3" json:"poster_url,omitempty"`
-	EpisodesCount int32                  `protobuf:"varint,6,opt,name=episodes_count,json=episodesCount,proto3" json:"episodes_count,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Translations  []*Translation         `protobuf:"bytes,8,rep,name=translations,proto3" json:"translations,omitempty"`
-	Year          int32                  `protobuf:"varint,9,opt,name=year,proto3" json:"year,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	KodikId         string                 `protobuf:"bytes,1,opt,name=kodik_id,json=kodikId,proto3" json:"kodik_id,omitempty"`
+	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description     string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Genres          []string               `protobuf:"bytes,4,rep,name=genres,proto3" json:"genres,omitempty"`
+	PosterUrl       string                 `protobuf:"bytes,5,opt,name=poster_url,json=posterUrl,proto3" json:"poster_url,omitempty"`
+	EpisodesCount   int32                  `protobuf:"varint,6,opt,name=episodes_count,json=episodesCount,proto3" json:"episodes_count,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Translations    []*Translation         `protobuf:"bytes,8,rep,name=translations,proto3" json:"translations,omitempty"`
+	Year            int32                  `protobuf:"varint,9,opt,name=year,proto3" json:"year,omitempty"`
+	KinopoiskRating float64                `protobuf:"fixed64,10,opt,name=kinopoisk_rating,json=kinopoiskRating,proto3" json:"kinopoisk_rating,omitempty"`
+	AnimePosterUrl  string                 `protobuf:"bytes,11,opt,name=anime_poster_url,json=animePosterUrl,proto3" json:"anime_poster_url,omitempty"`
+	FullData        *structpb.Struct       `protobuf:"bytes,12,opt,name=full_data,json=fullData,proto3" json:"full_data,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Anime) Reset() {
@@ -188,6 +192,27 @@ func (x *Anime) GetYear() int32 {
 		return x.Year
 	}
 	return 0
+}
+
+func (x *Anime) GetKinopoiskRating() float64 {
+	if x != nil {
+		return x.KinopoiskRating
+	}
+	return 0
+}
+
+func (x *Anime) GetAnimePosterUrl() string {
+	if x != nil {
+		return x.AnimePosterUrl
+	}
+	return ""
+}
+
+func (x *Anime) GetFullData() *structpb.Struct {
+	if x != nil {
+		return x.FullData
+	}
+	return nil
 }
 
 type GetAnimeRequest struct {
@@ -350,11 +375,11 @@ var File_catalog_proto protoreflect.FileDescriptor
 
 const file_catalog_proto_rawDesc = "" +
 	"\n" +
-	"\rcatalog.proto\x12\x12aniflow.catalog.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"G\n" +
+	"\rcatalog.proto\x12\x12aniflow.catalog.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"G\n" +
 	"\vTranslation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\"\xcc\x02\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\"\xd7\x03\n" +
 	"\x05Anime\x12\x19\n" +
 	"\bkodik_id\x18\x01 \x01(\tR\akodikId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -366,7 +391,11 @@ const file_catalog_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12C\n" +
 	"\ftranslations\x18\b \x03(\v2\x1f.aniflow.catalog.v1.TranslationR\ftranslations\x12\x12\n" +
-	"\x04year\x18\t \x01(\x05R\x04year\",\n" +
+	"\x04year\x18\t \x01(\x05R\x04year\x12)\n" +
+	"\x10kinopoisk_rating\x18\n" +
+	" \x01(\x01R\x0fkinopoiskRating\x12(\n" +
+	"\x10anime_poster_url\x18\v \x01(\tR\x0eanimePosterUrl\x124\n" +
+	"\tfull_data\x18\f \x01(\v2\x17.google.protobuf.StructR\bfullData\",\n" +
 	"\x0fGetAnimeRequest\x12\x19\n" +
 	"\bkodik_id\x18\x01 \x01(\tR\akodikId\"V\n" +
 	"\rSearchRequest\x12\x14\n" +
@@ -400,20 +429,22 @@ var file_catalog_proto_goTypes = []any{
 	(*SearchRequest)(nil),         // 3: aniflow.catalog.v1.SearchRequest
 	(*SearchResponse)(nil),        // 4: aniflow.catalog.v1.SearchResponse
 	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),       // 6: google.protobuf.Struct
 }
 var file_catalog_proto_depIdxs = []int32{
 	5, // 0: aniflow.catalog.v1.Anime.updated_at:type_name -> google.protobuf.Timestamp
 	0, // 1: aniflow.catalog.v1.Anime.translations:type_name -> aniflow.catalog.v1.Translation
-	1, // 2: aniflow.catalog.v1.SearchResponse.items:type_name -> aniflow.catalog.v1.Anime
-	2, // 3: aniflow.catalog.v1.Catalog.GetAnime:input_type -> aniflow.catalog.v1.GetAnimeRequest
-	3, // 4: aniflow.catalog.v1.Catalog.Search:input_type -> aniflow.catalog.v1.SearchRequest
-	1, // 5: aniflow.catalog.v1.Catalog.GetAnime:output_type -> aniflow.catalog.v1.Anime
-	4, // 6: aniflow.catalog.v1.Catalog.Search:output_type -> aniflow.catalog.v1.SearchResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 2: aniflow.catalog.v1.Anime.full_data:type_name -> google.protobuf.Struct
+	1, // 3: aniflow.catalog.v1.SearchResponse.items:type_name -> aniflow.catalog.v1.Anime
+	2, // 4: aniflow.catalog.v1.Catalog.GetAnime:input_type -> aniflow.catalog.v1.GetAnimeRequest
+	3, // 5: aniflow.catalog.v1.Catalog.Search:input_type -> aniflow.catalog.v1.SearchRequest
+	1, // 6: aniflow.catalog.v1.Catalog.GetAnime:output_type -> aniflow.catalog.v1.Anime
+	4, // 7: aniflow.catalog.v1.Catalog.Search:output_type -> aniflow.catalog.v1.SearchResponse
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_catalog_proto_init() }

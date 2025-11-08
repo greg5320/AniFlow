@@ -2,6 +2,7 @@ syntax = "proto3";
 package aniflow.catalog.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 option go_package = "github.com/greg5320/aniflow/services/catalog/gen;catalogpb";
 
@@ -21,6 +22,9 @@ message Anime {
   google.protobuf.Timestamp updated_at = 7;
   repeated Translation translations = 8;
   int32 year = 9;
+  double kinopoisk_rating = 10;
+  string anime_poster_url = 11;
+  google.protobuf.Struct full_data = 12;
 }
 
 message GetAnimeRequest {
