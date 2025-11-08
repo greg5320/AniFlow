@@ -16,15 +16,28 @@ type Client struct {
 	client *http.Client
 }
 
+type Translation struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+}
+
 type Material struct {
 	ID            string                 `json:"id"`
+	Type          string                 `json:"type"`
+	Link          string                 `json:"link"`
 	Title         string                 `json:"title"`
 	TitleOrig     string                 `json:"title_orig"`
+	OtherTitle    string                 `json:"other_title"`
 	Description   string                 `json:"description"`
 	Year          int                    `json:"year"`
 	EpisodesCount int                    `json:"episodes_count"`
 	PosterURL     string                 `json:"poster_url"`
-	Image         string                 `json:"image"` 
+	Image         string                 `json:"image"`
+	KinopoiskID   string                 `json:"kinopoisk_id"`
+	ImdbID        string                 `json:"imdb_id"`
+	ShikimoriID   string                 `json:"shikimori_id"`
+	Translation   *Translation           `json:"translation"`
 	Raw           map[string]interface{} `json:"-"`
 }
 
@@ -172,3 +185,41 @@ func (c *Client) Search(ctx context.Context, title string, limit int, withMateri
 	}
 	return &lr, nil
 }
+
+func (c *Client) SearchByKinopoiskID(ctx context.Context, kinopoiskID string, limit int, withMaterialData bool) (*ListResponse, error) {
+	u, _ := url.Parse("https://kodikapi.com/search")
+	q := u.Query()
+	q.Set("token", c.token)
+	q.Set("kinopoisk_id", kinopoiskID)
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	if withMaterialData {
+		q.Set("with_material_data", "true")
+	}
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var lr ListResponse
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&lr); err != nil {
+		return nil, err
+	}
+	for i := range lr.Results {
+		if lr.Results[i].PosterURL == "" && lr.Results[i].Image != "" {
+			lr.Results[i].PosterURL = lr.Results[i].Image
+		}
+	}
+	return &lr, nil
+}
+

@@ -49,7 +49,6 @@ func main() {
 
 	r := gin.Default()
 
-	// POST /v1/search
 	r.POST("/v1/search", func(c *gin.Context) {
 		var req struct {
 			Query    string `json:"query"`
@@ -83,7 +82,6 @@ func main() {
 		c.JSON(http.StatusOK, grpcResp)
 	})
 
-	// GET /v1/anime/:kodik_id
 	r.GET("/v1/anime/:kodik_id", func(c *gin.Context) {
 		kid := c.Param("kodik_id")
 		if kid == "" {
