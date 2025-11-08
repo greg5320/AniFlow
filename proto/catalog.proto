@@ -1,0 +1,37 @@
+syntax = "proto3";
+package aniflow.catalog.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/greg5320/aniflow/services/catalog/gen;catalogpb";
+
+message Anime {
+  string kodik_id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string genres = 4;
+  string poster_url = 5;
+  int32 episodes_count = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GetAnimeRequest {
+  string kodik_id = 1;
+}
+
+message SearchRequest {
+  string query = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message SearchResponse {
+  repeated Anime items = 1;
+  int32 total = 2;
+}
+
+service Catalog {
+  // unary RPCs for simple needs
+  rpc GetAnime(GetAnimeRequest) returns (Anime);
+  rpc Search(SearchRequest) returns (SearchResponse);
+}

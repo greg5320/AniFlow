@@ -1,0 +1,36 @@
+syntax = "proto3";
+package aniflow.library.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/greg5320/aniflow/services/library/gen;librarypb";
+
+message WatchlistItem {
+  string id = 1;
+  string user_id = 2;
+  string kodik_id = 3;
+  google.protobuf.Timestamp added_at = 4;
+}
+
+message AddRequest {
+  string user_id = 1;
+  string kodik_id = 2;
+}
+
+message AddResponse {
+  WatchlistItem item = 1;
+}
+
+message GetWatchlistRequest {
+  string user_id = 1;
+}
+
+message GetWatchlistResponse {
+  repeated WatchlistItem items = 1;
+}
+
+service Library {
+  rpc AddToWatchlist(AddRequest) returns (AddResponse);
+  rpc GetWatchlist(GetWatchlistRequest) returns (GetWatchlistResponse);
+  // ReportProgress можно добавить позже
+}
