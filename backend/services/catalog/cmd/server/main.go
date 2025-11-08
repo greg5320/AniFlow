@@ -1,4 +1,3 @@
-// AniFlow/backend/services/catalog/cmd/server/main.go
 package main
 
 import (
@@ -9,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	// "time"
+	"strings"
 
 	kodik "github.com/greg5320/AniFlow/backend/services/catalog/internal/kodik" 
 	pb "github.com/greg5320/AniFlow/backend/services/catalog/gen" 
@@ -21,6 +21,13 @@ type server struct {
 	client *kodik.Client
 }
 
+func isKodikID(s string) bool {
+	if s == "" {
+		return false
+	}
+	return strings.HasPrefix(s, "movie-") || strings.HasPrefix(s, "serial-")
+}
+
 func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchResponse, error) {
 	page := int(req.Page)
 	if page < 1 {
@@ -30,28 +37,35 @@ func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchR
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-	types := "anime"
 
-	var next string
-	var lastRes *kodik.ListResponse
-	for p := 1; p <= page; p++ {
-		lr, err := s.client.FetchPage(ctx, pageSize, next, types, false, false)
+	if req.Query != "" && isKodikID(req.Query) {
+		mat, err := s.client.FetchByID(ctx, req.Query, true)
 		if err != nil {
 			return nil, err
 		}
-		lastRes = lr
-		if lr.NextPage == nil || *lr.NextPage == "" {
-			next = ""
-			break
+		resp := &pb.SearchResponse{
+			Items: []*pb.Anime{
+				{
+					KodikId:      mat.ID,
+					Title:        mat.Title,
+					Description:  mat.Description,
+					PosterUrl:    mat.PosterURL,
+					EpisodesCount: int32(mat.EpisodesCount),
+					UpdatedAt:    timestamppb.Now(),
+				},
+			},
+			Total: 1,
 		}
-		next = *lr.NextPage
+		return resp, nil
 	}
-	if lastRes == nil {
-		return &pb.SearchResponse{}, nil
+
+	lr, err := s.client.Search(ctx, req.Query, pageSize, false)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := &pb.SearchResponse{}
-	for _, m := range lastRes.Results {
+	for _, m := range lr.Results {
 		anime := &pb.Anime{
 			KodikId:      m.ID,
 			Title:        m.Title,
@@ -62,16 +76,16 @@ func (s *server) Search(ctx context.Context, req *pb.SearchRequest) (*pb.SearchR
 		}
 		resp.Items = append(resp.Items, anime)
 	}
-	resp.Total = int32(lastRes.Total)
+	resp.Total = int32(lr.Total)
 	return resp, nil
 }
 
 func (s *server) GetAnime(ctx context.Context, req *pb.GetAnimeRequest) (*pb.Anime, error) {
-	 err := s.client.FetchPage(ctx, 1, "", "", false, true)
+	lr, err := s.client.FetchPage(ctx, 1, "", "", false, true)
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println(lr)
 	return &pb.Anime{
 		KodikId: req.KodikId,
 		Title:   "TODO implement GetAnime properly (FetchByID)",

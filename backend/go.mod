@@ -1,4 +1,4 @@
-module AniFlow
+module github.com/greg5320/AniFlow/backend
 
 go 1.25.1
 

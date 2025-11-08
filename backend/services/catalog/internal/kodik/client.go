@@ -1,4 +1,3 @@
-
 package kodik
 
 import (
@@ -29,7 +28,7 @@ type Material struct {
 	Raw           map[string]interface{} `json:"-"`
 }
 
-type listResponse struct {
+type ListResponse struct {
 	Time     string     `json:"time"`
 	Total    int        `json:"total"`
 	PrevPage *string    `json:"prev_page"`
@@ -47,7 +46,7 @@ func NewClient(token string) *Client {
 }
 
 
-func (c *Client) FetchPage(ctx context.Context, limit int, next string, types string, withEpisodes bool, withMaterialData bool) (*listResponse, error) {
+func (c *Client) FetchPage(ctx context.Context, limit int, next string, types string, withEpisodes bool, withMaterialData bool) (*ListResponse, error) {
 	u, _ := url.Parse(baseURL)
 	q := u.Query()
 	q.Set("token", c.token)
@@ -80,12 +79,92 @@ func (c *Client) FetchPage(ctx context.Context, limit int, next string, types st
 	}
 	defer resp.Body.Close()
 
-	var lr listResponse
+	var lr ListResponse
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&lr); err != nil {
 		return nil, err
 	}
-	
+
+	for i := range lr.Results {
+		if lr.Results[i].PosterURL == "" && lr.Results[i].Image != "" {
+			lr.Results[i].PosterURL = lr.Results[i].Image
+		}
+	}
+	return &lr, nil
+}
+
+func (c *Client) FetchByID(ctx context.Context, id string, withMaterialData bool) (*Material, error) {
+	u, _ := url.Parse(baseURL)
+	q := u.Query()
+	q.Set("token", c.token)
+	q.Set("id", id)
+	q.Set("limit", "1")
+	if withMaterialData {
+		q.Set("with_material_data", "true")
+	}
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var lr ListResponse
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&lr); err != nil {
+		return nil, err
+	}
+
+	if len(lr.Results) == 0 {
+		return nil, fmt.Errorf("material with id %s not found", id)
+	}
+
+	m := lr.Results[0]
+	if m.PosterURL == "" && m.Image != "" {
+		m.PosterURL = m.Image
+	}
+	return &m, nil
+}
+
+func (c *Client) Search(ctx context.Context, title string, limit int, withMaterialData bool) (*ListResponse, error) {
+	u, _ := url.Parse("https://kodikapi.com/search")
+	q := u.Query()
+	q.Set("token", c.token)
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	if title != "" {
+		q.Set("title", title)
+	}
+	if withMaterialData {
+		q.Set("with_material_data", "true")
+	}
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var lr ListResponse
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&lr); err != nil {
+		return nil, err
+	}
+
 	for i := range lr.Results {
 		if lr.Results[i].PosterURL == "" && lr.Results[i].Image != "" {
 			lr.Results[i].PosterURL = lr.Results[i].Image
